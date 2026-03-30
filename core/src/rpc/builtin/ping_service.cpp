@@ -1,6 +1,7 @@
 #include "ibridger/rpc/builtin/ping_service.h"
 #include "ibridger/rpc.pb.h"
 #include "ibridger/constants.pb.h"
+#include "ibridger/common/error.h"
 
 #include <chrono>
 
@@ -22,7 +23,7 @@ MethodHandler PingService::get_method(const std::string& method) const {
     return [](const std::string& payload) -> std::pair<std::string, std::error_code> {
         ibridger::Ping ping;
         if (!ping.ParseFromString(payload)) {
-            return {{}, std::make_error_code(std::errc::bad_message)};
+            return {{}, common::make_error_code(common::Error::serialization_error)};
         }
 
         const auto now_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
@@ -34,7 +35,7 @@ MethodHandler PingService::get_method(const std::string& method) const {
 
         std::string out;
         if (!pong.SerializeToString(&out)) {
-            return {{}, std::make_error_code(std::errc::io_error)};
+            return {{}, common::make_error_code(common::Error::serialization_error)};
         }
         return {std::move(out), {}};
     };

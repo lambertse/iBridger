@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 #include "ibridger/protocol/framing.h"
 #include "ibridger/transport/unix_socket_transport.h"
+#include "ibridger/common/error.h"
 
 #include <sys/socket.h>
 #include <unistd.h>
@@ -87,7 +88,7 @@ TEST(FramedConnection, SendRejectsOversizedPayload) {
     oversized.resize(kMaxFrameSize + 1);
 
     auto err = sender.send_frame(oversized);
-    EXPECT_EQ(err, std::make_error_code(std::errc::message_size));
+    EXPECT_EQ(err, ibridger::common::make_error_code(ibridger::common::Error::frame_too_large));
 }
 
 // ─── recv_frame rejects oversized length header ───────────────────────────────
@@ -110,7 +111,7 @@ TEST(FramedConnection, RecvRejectsOversizedLengthHeader) {
     ::close(fds[0]);
 
     auto [frame, err] = receiver.recv_frame();
-    EXPECT_EQ(err, std::make_error_code(std::errc::message_size));
+    EXPECT_EQ(err, ibridger::common::make_error_code(ibridger::common::Error::frame_too_large));
 }
 
 // ─── recv_frame returns error on mid-frame disconnect ─────────────────────────

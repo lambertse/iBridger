@@ -2,6 +2,7 @@
 #include "ibridger/rpc/client.h"
 #include "ibridger/rpc/server.h"
 #include "ibridger/rpc/service.h"
+#include "ibridger/common/error.h"
 
 #include <unistd.h>
 
@@ -161,7 +162,7 @@ TEST(Client, CallBeforeConnectReturnsError) {
     Client client(cfg);
 
     auto [resp, err] = client.call("EchoService", "Echo", "hi");
-    EXPECT_EQ(err, std::make_error_code(std::errc::not_connected));
+    EXPECT_EQ(err, ibridger::common::make_error_code(ibridger::common::Error::not_connected));
 }
 
 // ─── Reconnect after disconnect ───────────────────────────────────────────────

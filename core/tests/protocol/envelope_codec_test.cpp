@@ -2,6 +2,7 @@
 #include "ibridger/protocol/envelope_codec.h"
 #include "ibridger/protocol/framing.h"
 #include "ibridger/transport/unix_socket_transport.h"
+#include "ibridger/common/error.h"
 
 #include <sys/socket.h>
 #include <unistd.h>
@@ -121,8 +122,8 @@ TEST(EnvelopeCodec, CorruptedPayloadReturnsParseError) {
     ASSERT_FALSE(injector.send_frame(garbage));
 
     auto [env, err] = receiver.recv();
-    EXPECT_EQ(err, std::make_error_code(std::errc::bad_message))
-        << "Expected bad_message for corrupted payload, got: " << err.message();
+    EXPECT_EQ(err, ibridger::common::make_error_code(ibridger::common::Error::serialization_error))
+        << "Expected serialization_error for corrupted payload, got: " << err.message();
     // The returned Envelope must be empty/default — not partially populated.
     EXPECT_EQ(env.request_id(), 0ULL);
     EXPECT_EQ(env.service_name(), "");

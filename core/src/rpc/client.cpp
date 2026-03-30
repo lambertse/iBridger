@@ -1,4 +1,6 @@
 #include "ibridger/rpc/client.h"
+#include "ibridger/common/logger.h"
+#include "ibridger/common/error.h"
 
 namespace ibridger {
 namespace rpc {
@@ -15,16 +17,20 @@ Client::~Client() {
 std::error_code Client::connect() {
     std::lock_guard<std::mutex> lock(mutex_);
 
-    if (codec_) return std::make_error_code(std::errc::already_connected);
+    if (codec_) return common::make_error_code(common::Error::already_connected);
 
     transport_ = transport::TransportFactory::create(config_.transport);
-    if (!transport_) return std::make_error_code(std::errc::not_supported);
+    if (!transport_) return common::make_error_code(common::Error::internal);
 
     auto [conn, err] = transport_->connect(config_.endpoint);
-    if (err) return err;
+    if (err) {
+        common::Logger::error("Client: connect failed: " + err.message());
+        return err;
+    }
 
     framed_ = std::make_shared<protocol::FramedConnection>(std::move(conn));
     codec_  = std::make_unique<protocol::EnvelopeCodec>(framed_);
+    common::Logger::info("Client: connected to " + config_.endpoint);
     return {};
 }
 
@@ -36,6 +42,7 @@ void Client::disconnect() {
     if (framed_) {
         framed_->close();
         framed_.reset();
+        common::Logger::info("Client: disconnected");
     }
     codec_.reset();
     transport_.reset();
@@ -58,7 +65,7 @@ std::pair<ibridger::Envelope, std::error_code> Client::call(
     std::lock_guard<std::mutex> lock(mutex_);
 
     if (!codec_) {
-        return {ibridger::Envelope{}, std::make_error_code(std::errc::not_connected)};
+        return {ibridger::Envelope{}, common::make_error_code(common::Error::not_connected)};
     }
 
     const uint64_t id = next_request_id_++;
@@ -81,8 +88,11 @@ std::pair<ibridger::Envelope, std::error_code> Client::call(
 
     // Validate correlation — a mismatch indicates a protocol bug.
     if (response.request_id() != id) {
+        common::Logger::error("Client: request_id mismatch (sent " +
+            std::to_string(id) + ", got " +
+            std::to_string(response.request_id()) + ")");
         return {ibridger::Envelope{},
-                std::make_error_code(std::errc::protocol_error)};
+                common::make_error_code(common::Error::protocol_error)};
     }
 
     return {std::move(response), {}};

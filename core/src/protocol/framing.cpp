@@ -1,4 +1,5 @@
 #include "ibridger/protocol/framing.h"
+#include "ibridger/common/error.h"
 
 #include <cerrno>
 #include <cstdint>
@@ -13,7 +14,7 @@ FramedConnection::FramedConnection(std::unique_ptr<transport::IConnection> conn)
 
 std::error_code FramedConnection::send_frame(const std::string& data) {
     if (data.size() > kMaxFrameSize) {
-        return std::make_error_code(std::errc::message_size);
+        return common::make_error_code(common::Error::frame_too_large);
     }
 
     // Encode payload length as 4-byte big-endian header.
@@ -55,7 +56,7 @@ std::pair<std::string, std::error_code> FramedConnection::recv_frame() {
         (static_cast<uint32_t>(header[3]) <<  0);
 
     if (len > kMaxFrameSize) {
-        return {"", std::make_error_code(std::errc::message_size)};
+        return {"", common::make_error_code(common::Error::frame_too_large)};
     }
 
     if (len == 0) {

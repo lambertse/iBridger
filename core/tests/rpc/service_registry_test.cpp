@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 #include "ibridger/rpc/service_registry.h"
+#include "ibridger/common/error.h"
 
 #include <algorithm>
 
@@ -101,8 +102,8 @@ TEST(ServiceRegistry, DuplicateRegistrationReturnsError) {
     ASSERT_FALSE(registry.register_service(make_echo_service()));
 
     auto err = registry.register_service(make_echo_service());
-    EXPECT_EQ(err, std::make_error_code(std::errc::file_exists))
-        << "Expected file_exists for duplicate, got: " << err.message();
+    EXPECT_EQ(err, ibridger::common::make_error_code(ibridger::common::Error::already_registered))
+        << "Expected already_registered for duplicate, got: " << err.message();
 
     // Registry should still contain exactly one entry.
     EXPECT_EQ(registry.size(), 1u);

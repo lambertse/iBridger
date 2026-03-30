@@ -3,6 +3,8 @@
 // iBridger core — convenience header.
 // Including this single header gives access to the full core API.
 
+#include "ibridger/common/logger.h"
+#include "ibridger/common/error.h"
 #include "ibridger/transport/connection.h"
 #include "ibridger/transport/transport.h"
 #include "ibridger/transport/transport_factory.h"

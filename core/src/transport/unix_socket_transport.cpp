@@ -1,4 +1,5 @@
 #include "ibridger/transport/unix_socket_transport.h"
+#include "ibridger/common/logger.h"
 
 #if defined(__unix__) || defined(__APPLE__)
 
@@ -136,6 +137,8 @@ UnixSocketTransport::connect(const std::string& endpoint) {
     if (::connect(fd, reinterpret_cast<struct sockaddr*>(&addr), sizeof(addr)) < 0) {
         int err = errno;
         ::close(fd);
+        common::Logger::error("UnixSocket: connect failed on " + endpoint +
+            ": " + std::error_code(err, std::system_category()).message());
         return std::make_pair(std::unique_ptr<IConnection>(),
                               std::error_code(err, std::system_category()));
     }

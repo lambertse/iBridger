@@ -1,5 +1,7 @@
 add_executable(ibridger_tests
   convenience_header_test.cpp
+  common/logger_test.cpp
+  common/error_test.cpp
   sanity_test.cpp
   proto_test.cpp
   transport/unix_socket_test.cpp

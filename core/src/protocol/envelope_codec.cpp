@@ -1,4 +1,5 @@
 #include "ibridger/protocol/envelope_codec.h"
+#include "ibridger/common/error.h"
 
 namespace ibridger {
 namespace protocol {
@@ -11,7 +12,7 @@ std::error_code EnvelopeCodec::send(const ibridger::Envelope& envelope) {
     if (!envelope.SerializeToString(&bytes)) {
         // Serialization failure is extremely rare (only if required fields
         // are missing in proto2; proto3 always succeeds).
-        return std::make_error_code(std::errc::invalid_argument);
+        return common::make_error_code(common::Error::serialization_error);
     }
     return conn_->send_frame(bytes);
 }
@@ -24,7 +25,7 @@ std::pair<ibridger::Envelope, std::error_code> EnvelopeCodec::recv() {
 
     ibridger::Envelope envelope;
     if (!envelope.ParseFromString(bytes)) {
-        return {ibridger::Envelope{}, std::make_error_code(std::errc::bad_message)};
+        return {ibridger::Envelope{}, common::make_error_code(common::Error::serialization_error)};
     }
 
     return {std::move(envelope), {}};

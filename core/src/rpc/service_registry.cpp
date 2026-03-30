@@ -1,4 +1,5 @@
 #include "ibridger/rpc/service_registry.h"
+#include "ibridger/common/error.h"
 
 namespace ibridger {
 namespace rpc {
@@ -8,7 +9,7 @@ std::error_code ServiceRegistry::register_service(std::shared_ptr<IService> serv
 
     const auto& svc_name = service->name();
     if (services_.count(svc_name)) {
-        return std::make_error_code(std::errc::file_exists);
+        return common::make_error_code(common::Error::already_registered);
     }
 
     services_.emplace(svc_name, std::move(service));
