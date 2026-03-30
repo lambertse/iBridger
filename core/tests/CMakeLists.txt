@@ -9,6 +9,7 @@ add_executable(ibridger_tests
   rpc/service_registry_test.cpp
   rpc/dispatcher_test.cpp
   rpc/server_test.cpp
+  rpc/client_test.cpp
 )
 
 target_link_libraries(ibridger_tests PRIVATE
