@@ -7,6 +7,7 @@ endif()
 set(PROTO_FILES
   ibridger/envelope.proto
   ibridger/rpc.proto
+  ibridger/examples/echo.proto
 )
 
 add_library(ibridger_proto STATIC ${PROTO_FILES})

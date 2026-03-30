@@ -18,6 +18,9 @@ target_include_directories(ibridger_core PUBLIC
 
 target_link_libraries(ibridger_core PUBLIC ibridger_proto)
 
+# Namespaced alias so consumers can write target_link_libraries(... ibridger::core)
+add_library(ibridger::core ALIAS ibridger_core)
+
 if(IBRIDGER_BUILD_TESTS)
   add_subdirectory(tests)
 endif()
