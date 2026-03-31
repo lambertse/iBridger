@@ -16,12 +16,14 @@ target_link_libraries(ibridger_sdk_cpp PUBLIC ibridger::core)
 add_library(ibridger::sdk::cpp ALIAS ibridger_sdk_cpp)
 
 # ─── Install rules ────────────────────────────────────────────────────────────
-install(TARGETS ibridger_sdk_cpp EXPORT ibridger-targets
-  ARCHIVE DESTINATION lib
-)
-install(DIRECTORY include/ibridger
-  DESTINATION include
-)
+if(NOT DEFINED protobuf_SOURCE_DIR)
+  install(TARGETS ibridger_sdk_cpp EXPORT ibridger-targets
+    ARCHIVE DESTINATION lib
+  )
+  install(DIRECTORY include/ibridger
+    DESTINATION include
+  )
+endif()
 
 # ─── Tests ────────────────────────────────────────────────────────────────────
 

@@ -14,7 +14,7 @@ Four-layer stack (bottom-up):
 | SDK | Ergonomic public API | `ServerBuilder`, `ClientStub` | `IBridgerServer`, `IBridgerClient` |
 
 ```
-┌──────────────────────┐  ┌──────────────────────┐  ┌─────────────────┐
+┌──────────────────────┐  ┌───────────────────────┐  ┌─────────────────┐
 │   C++ SDK            │  │   JS/TS SDK           │  │   Future SDK    │
 │   sdk/cpp/           │  │   sdk/js/             │  │   (Go, Python…) │
 └──────────┬───────────┘  └──────────┬────────────┘  └────────┬────────┘

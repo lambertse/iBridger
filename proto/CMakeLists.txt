@@ -28,11 +28,15 @@ target_include_directories(ibridger_proto PUBLIC
 )
 
 # ─── Install rules ────────────────────────────────────────────────────────────
-install(TARGETS ibridger_proto EXPORT ibridger-targets
-  ARCHIVE DESTINATION lib
-)
-# Install proto-generated headers (they live in the build tree)
-install(DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/ibridger
-  DESTINATION include
-  FILES_MATCHING PATTERN "*.h"
-)
+# Only export when protobuf is an imported target (system / find_package).
+# When FetchContent builds protobuf in-tree, protobuf::libprotobuf is a built
+# target and CMake forbids including it in an install(EXPORT) set.
+if(NOT DEFINED protobuf_SOURCE_DIR)
+  install(TARGETS ibridger_proto EXPORT ibridger-targets
+    ARCHIVE DESTINATION lib
+  )
+  install(DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/ibridger
+    DESTINATION include
+    FILES_MATCHING PATTERN "*.h"
+  )
+endif()
