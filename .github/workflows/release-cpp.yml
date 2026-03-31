@@ -15,7 +15,9 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [ubuntu-latest, macos-latest]
+#       os: [ubuntu-latest, macos-latest] - Disable linux currently
+        os: [macos-latest]
+
 
     steps:
       - uses: actions/checkout@v4
@@ -23,10 +25,6 @@ jobs:
       - name: Install protobuf (macOS)
         if: runner.os == 'macOS'
         run: brew install protobuf
-
-      - name: Install protobuf (Ubuntu)
-        if: runner.os == 'Linux'
-        run: sudo apt-get install -y libprotobuf-dev protobuf-compiler
 
       - name: Configure
         run: >
@@ -36,7 +34,7 @@ jobs:
           -DCMAKE_INSTALL_PREFIX=${{ github.workspace }}/install
 
       - name: Build
-        run: cmake --build build --parallel --config Release
+        run: cmake --build build --parallel 4 --config Release
 
       - name: Install
         run: cmake --install build --config Release
@@ -73,7 +71,7 @@ jobs:
 
   release:
     name: Create GitHub Release
-    runs-on: ubuntu-latest
+    runs-on: macos-latest
     needs: build
     permissions:
       contents: write

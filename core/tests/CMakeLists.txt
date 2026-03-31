@@ -21,4 +21,4 @@ target_link_libraries(ibridger_tests PRIVATE
   GTest::gtest_main
 )
 
-gtest_discover_tests(ibridger_tests)
+gtest_discover_tests(ibridger_tests PROPERTIES TIMEOUT 30)

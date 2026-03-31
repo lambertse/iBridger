@@ -13,12 +13,13 @@ on:
       - 'v*'
 
 permissions:
+  contents: read   # Required: allows actions/checkout to fetch the repository
   id-token: write  # Required: allows GitHub to generate the OIDC token for npm
 
 jobs:
   publish:
     name: npm publish
-    runs-on: ubuntu-latest
+    runs-on: macos-latest 
 
     steps:
       - uses: actions/checkout@v4
@@ -48,8 +49,6 @@ jobs:
         run: npm version "${GITHUB_REF_NAME#v}" --no-git-tag-version
 
       # --provenance: attaches cryptographic proof of which workflow built this package
-      # --access public: required for scoped packages (@ibridger/sdk) — they default to private
-      # No NODE_AUTH_TOKEN needed — npm exchanges the OIDC token automatically
       - name: Publish to npm
         working-directory: sdk/js
         run: npm publish --provenance --access public
