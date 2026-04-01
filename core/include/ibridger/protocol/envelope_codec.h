@@ -1,11 +1,11 @@
 #pragma once
 
-#include "ibridger/protocol/framing.h"
-#include "ibridger/envelope.pb.h"
-
 #include <memory>
 #include <system_error>
 #include <utility>
+
+#include "ibridger/envelope.pb.h"
+#include "ibridger/protocol/framing.h"
 
 namespace ibridger {
 namespace protocol {
@@ -21,19 +21,19 @@ namespace protocol {
 ///   - std::errc::bad_message  — protobuf parse failure (corrupted frame)
 ///   - any error from FramedConnection — transport / framing failure
 class EnvelopeCodec {
-public:
-    explicit EnvelopeCodec(std::shared_ptr<FramedConnection> conn);
+ public:
+  explicit EnvelopeCodec(std::shared_ptr<FramedConnection> conn);
 
-    /// Serialize `envelope` and send it as a single frame.
-    std::error_code send(const ibridger::Envelope& envelope);
+  /// Serialize `envelope` and send it as a single frame.
+  std::error_code send(const ibridger::Envelope& envelope);
 
-    /// Receive the next frame and deserialize it into an Envelope.
-    /// Returns (Envelope{}, error) on any failure.
-    std::pair<ibridger::Envelope, std::error_code> recv();
+  /// Receive the next frame and deserialize it into an Envelope.
+  /// Returns (Envelope{}, error) on any failure.
+  std::pair<ibridger::Envelope, std::error_code> recv();
 
-private:
-    std::shared_ptr<FramedConnection> conn_;
+ private:
+  std::shared_ptr<FramedConnection> conn_;
 };
 
-} // namespace protocol
-} // namespace ibridger
+}  // namespace protocol
+}  // namespace ibridger

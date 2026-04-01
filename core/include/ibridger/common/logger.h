@@ -26,25 +26,25 @@ using LogCallback = std::function<void(LogLevel, const std::string&)>;
 ///   Logger::set_level(LogLevel::INFO);
 ///   Logger::log(LogLevel::INFO, "server started");
 class Logger {
-public:
-    /// Replace the active log callback. Pass nullptr to silence output.
-    static void set_callback(LogCallback cb);
+ public:
+  /// Replace the active log callback. Pass nullptr to silence output.
+  static void set_callback(LogCallback cb);
 
-    /// Set the minimum level; messages below this level are dropped.
-    static void set_level(LogLevel min_level);
+  /// Set the minimum level; messages below this level are dropped.
+  static void set_level(LogLevel min_level);
 
-    /// Emit a log message (no-op if below min_level or no callback set).
-    static void log(LogLevel level, const std::string& msg);
+  /// Emit a log message (no-op if below min_level or no callback set).
+  static void log(LogLevel level, const std::string& msg);
 
-    /// Convenience helpers.
-    static void debug(const std::string& msg) { log(LogLevel::DEBUG, msg); }
-    static void info (const std::string& msg) { log(LogLevel::INFO,  msg); }
-    static void warn (const std::string& msg) { log(LogLevel::WARN,  msg); }
-    static void error(const std::string& msg) { log(LogLevel::ERROR, msg); }
+  /// Convenience helpers.
+  static void debug(const std::string& msg) { log(LogLevel::DEBUG, msg); }
+  static void info(const std::string& msg) { log(LogLevel::INFO, msg); }
+  static void warn(const std::string& msg) { log(LogLevel::WARN, msg); }
+  static void error(const std::string& msg) { log(LogLevel::ERROR, msg); }
 
-    /// Convert a LogLevel to a short string ("DEBUG", "INFO", …).
-    static const char* level_name(LogLevel level);
+  /// Convert a LogLevel to a short string ("DEBUG", "INFO", …).
+  static const char* level_name(LogLevel level);
 };
 
-} // namespace common
-} // namespace ibridger
+}  // namespace common
+}  // namespace ibridger

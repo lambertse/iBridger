@@ -7,10 +7,11 @@ namespace rpc {
 namespace builtin {
 
 /// Canonical server_id returned in every Pong response.
-/// Documented in proto/ibridger/constants.proto and enforced by cross-language tests.
-constexpr const char* kPingServerId    = "ibridger-server";
+/// Documented in proto/ibridger/constants.proto and enforced by cross-language
+/// tests.
+constexpr const char* kPingServerId = "ibridger-server";
 constexpr const char* kPingServiceName = "ibridger.Ping";
-constexpr const char* kPingMethodName  = "Ping";
+constexpr const char* kPingMethodName = "Ping";
 
 /// Built-in health-check service.
 ///
@@ -21,12 +22,12 @@ constexpr const char* kPingMethodName  = "Ping";
 ///
 /// Auto-registered by Server when ServerConfig::register_builtins == true.
 class PingService : public IService {
-public:
-    std::string name() const override;
-    std::vector<std::string> methods() const override;
-    MethodHandler get_method(const std::string& method) const override;
+ public:
+  std::string name() const override;
+  std::vector<std::string> methods() const override;
+  MethodHandler get_method(const std::string& method) const override;
 };
 
-} // namespace builtin
-} // namespace rpc
-} // namespace ibridger
+}  // namespace builtin
+}  // namespace rpc
+}  // namespace ibridger

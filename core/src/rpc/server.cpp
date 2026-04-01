@@ -1,155 +1,159 @@
 #include "ibridger/rpc/server.h"
-#include "ibridger/protocol/envelope_codec.h"
-#include "ibridger/rpc/builtin/ping_service.h"
-#include "ibridger/common/logger.h"
-#include "ibridger/common/error.h"
 
 #include <algorithm>
+
+#include "ibridger/common/error.h"
+#include "ibridger/common/logger.h"
+#include "ibridger/protocol/envelope_codec.h"
+#include "ibridger/rpc/builtin/ping_service.h"
 
 namespace ibridger {
 namespace rpc {
 
 Server::Server(ServerConfig config)
-    : config_(std::move(config))
-    , registry_(std::make_shared<ServiceRegistry>())
-    , dispatcher_(std::make_unique<Dispatcher>(registry_)) {
-    if (config_.register_builtins) {
-        (void)registry_->register_service(std::make_shared<builtin::PingService>());
-    }
+    : config_(std::move(config)),
+      registry_(std::make_shared<ServiceRegistry>()),
+      dispatcher_(std::make_unique<Dispatcher>(registry_)) {
+  if (config_.register_builtins) {
+    (void)registry_->register_service(std::make_shared<builtin::PingService>());
+  }
 }
 
-Server::~Server() {
-    stop();
-}
+Server::~Server() { stop(); }
 
 void Server::register_service(std::shared_ptr<IService> service) {
-    registry_->register_service(std::move(service));
+  registry_->register_service(std::move(service));
 }
 
-// ─── start ────────────────────────────────────────────────────────────────────
+// ─── start
+// ────────────────────────────────────────────────────────────────────
 
 std::error_code Server::start() {
-    if (running_) return common::make_error_code(common::Error::already_connected);
+  if (running_)
+    return common::make_error_code(common::Error::already_connected);
 
-    transport_ = transport::TransportFactory::create(config_.transport);
-    if (!transport_) {
-        common::Logger::error("Server: transport not supported for endpoint: " + config_.endpoint);
-        return common::make_error_code(common::Error::internal);
-    }
+  transport_ = transport::TransportFactory::create(config_.transport);
+  if (!transport_) {
+    common::Logger::error("Server: transport not supported for endpoint: " +
+                          config_.endpoint);
+    return common::make_error_code(common::Error::internal);
+  }
 
-    if (auto err = transport_->listen(config_.endpoint)) {
-        common::Logger::error("Server: listen failed: " + err.message());
-        return err;
-    }
+  if (auto err = transport_->listen(config_.endpoint)) {
+    common::Logger::error("Server: listen failed: " + err.message());
+    return err;
+  }
 
-    running_ = true;
-    common::Logger::info("Server: listening on " + config_.endpoint);
-    accept_thread_ = std::thread(&Server::accept_loop, this);
-    return {};
+  running_ = true;
+  common::Logger::info("Server: listening on " + config_.endpoint);
+  accept_thread_ = std::thread(&Server::accept_loop, this);
+  return {};
 }
 
-// ─── stop ─────────────────────────────────────────────────────────────────────
+// ─── stop
+// ─────────────────────────────────────────────────────────────────────
 
 void Server::stop() {
-    if (!running_.exchange(false)) return;
+  if (!running_.exchange(false)) return;
 
-    common::Logger::info("Server: stopping");
-    // Unblock the accept() call.
-    if (transport_) transport_->close();
-    if (accept_thread_.joinable()) accept_thread_.join();
+  common::Logger::info("Server: stopping");
+  // Unblock the accept() call.
+  if (transport_) transport_->close();
+  if (accept_thread_.joinable()) accept_thread_.join();
 
-    // Close all active connections to unblock handler recv() calls.
-    std::vector<std::shared_ptr<protocol::FramedConnection>> snapshot;
-    {
-        std::lock_guard<std::mutex> lock(connections_mutex_);
-        snapshot = active_connections_;
-    }
-    for (auto& framed : snapshot) framed->close();
+  // Close all active connections to unblock handler recv() calls.
+  std::vector<std::shared_ptr<protocol::FramedConnection>> snapshot;
+  {
+    std::lock_guard<std::mutex> lock(connections_mutex_);
+    snapshot = active_connections_;
+  }
+  for (auto& framed : snapshot) framed->close();
 
-    // Join all handler threads.
-    std::vector<std::thread> threads;
-    {
-        std::lock_guard<std::mutex> lock(connections_mutex_);
-        threads = std::move(handler_threads_);
-    }
-    for (auto& t : threads) {
-        if (t.joinable()) t.join();
-    }
+  // Join all handler threads.
+  std::vector<std::thread> threads;
+  {
+    std::lock_guard<std::mutex> lock(connections_mutex_);
+    threads = std::move(handler_threads_);
+  }
+  for (auto& t : threads) {
+    if (t.joinable()) t.join();
+  }
 }
 
-bool Server::is_running() const {
-    return running_;
-}
+bool Server::is_running() const { return running_; }
 
-// ─── accept_loop ──────────────────────────────────────────────────────────────
+// ─── accept_loop
+// ──────────────────────────────────────────────────────────────
 
 void Server::accept_loop() {
-    while (running_) {
-        auto [conn, err] = transport_->accept();
-        if (err || !conn) break;   // error or server was closed
+  while (running_) {
+    auto [conn, err] = transport_->accept();
+    if (err || !conn) break;  // error or server was closed
 
-        // Reject if at connection limit.
-        {
-            std::lock_guard<std::mutex> lock(connections_mutex_);
-            if (active_connections_.size() >= config_.max_connections) {
-                conn->close();
-                continue;
-            }
-        }
-
-        auto framed = std::make_shared<protocol::FramedConnection>(std::move(conn));
-        common::Logger::debug("Server: connection accepted");
-
-        std::lock_guard<std::mutex> lock(connections_mutex_);
-        active_connections_.push_back(framed);
-        handler_threads_.emplace_back(
-            [this, framed]() { handle_connection(framed); });
-    }
-}
-
-// ─── handle_connection ────────────────────────────────────────────────────────
-
-void Server::handle_connection(std::shared_ptr<protocol::FramedConnection> framed) {
-    protocol::EnvelopeCodec codec(framed);
-
-    for (;;) {
-        auto [request, err] = codec.recv();
-        if (err) {
-            if (err != std::make_error_code(std::errc::connection_reset)) {
-                common::Logger::debug("Server: recv error: " + err.message());
-            }
-            break;
-        }
-
-        auto response = dispatcher_->dispatch(request);
-
-        if (response.type() == ibridger::ERROR) {
-            common::Logger::warn("Server: dispatch error [" +
-                request.service_name() + "/" + request.method_name() + "]: " +
-                response.error_message());
-        }
-
-        if (auto send_err = codec.send(response); send_err) {
-            common::Logger::debug("Server: send error: " + send_err.message());
-            break;
-        }
+    // Reject if at connection limit.
+    {
+      std::lock_guard<std::mutex> lock(connections_mutex_);
+      if (active_connections_.size() >= config_.max_connections) {
+        conn->close();
+        continue;
+      }
     }
 
-    common::Logger::debug("Server: connection closed");
-    remove_connection(framed.get());
+    auto framed = std::make_shared<protocol::FramedConnection>(std::move(conn));
+    common::Logger::debug("Server: connection accepted");
+
+    std::lock_guard<std::mutex> lock(connections_mutex_);
+    active_connections_.push_back(framed);
+    handler_threads_.emplace_back(
+        [this, framed]() { handle_connection(framed); });
+  }
 }
 
-// ─── remove_connection ────────────────────────────────────────────────────────
+// ─── handle_connection
+// ────────────────────────────────────────────────────────
+
+void Server::handle_connection(
+    std::shared_ptr<protocol::FramedConnection> framed) {
+  protocol::EnvelopeCodec codec(framed);
+
+  for (;;) {
+    auto [request, err] = codec.recv();
+    if (err) {
+      if (err != std::make_error_code(std::errc::connection_reset)) {
+        common::Logger::debug("Server: recv error: " + err.message());
+      }
+      break;
+    }
+
+    auto response = dispatcher_->dispatch(request);
+
+    if (response.type() == ibridger::ERROR) {
+      common::Logger::warn("Server: dispatch error [" + request.service_name() +
+                           "/" + request.method_name() +
+                           "]: " + response.error_message());
+    }
+
+    if (auto send_err = codec.send(response); send_err) {
+      common::Logger::debug("Server: send error: " + send_err.message());
+      break;
+    }
+  }
+
+  common::Logger::debug("Server: connection closed");
+  remove_connection(framed.get());
+}
+
+// ─── remove_connection
+// ────────────────────────────────────────────────────────
 
 void Server::remove_connection(protocol::FramedConnection* ptr) {
-    std::lock_guard<std::mutex> lock(connections_mutex_);
-    auto it = std::find_if(
-        active_connections_.begin(), active_connections_.end(),
-        [ptr](const auto& p) { return p.get() == ptr; });
-    if (it != active_connections_.end()) {
-        active_connections_.erase(it);
-    }
+  std::lock_guard<std::mutex> lock(connections_mutex_);
+  auto it = std::find_if(active_connections_.begin(), active_connections_.end(),
+                         [ptr](const auto& p) { return p.get() == ptr; });
+  if (it != active_connections_.end()) {
+    active_connections_.erase(it);
+  }
 }
 
-} // namespace rpc
-} // namespace ibridger
+}  // namespace rpc
+}  // namespace ibridger

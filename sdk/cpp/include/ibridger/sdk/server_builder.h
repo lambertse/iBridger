@@ -1,12 +1,12 @@
 #pragma once
 
-#include "ibridger/rpc/server.h"
-#include "ibridger/rpc/service.h"
-#include "ibridger/transport/transport_factory.h"
-
 #include <memory>
 #include <string>
 #include <vector>
+
+#include "ibridger/rpc/server.h"
+#include "ibridger/rpc/service.h"
+#include "ibridger/transport/transport_factory.h"
 
 namespace ibridger {
 namespace sdk {
@@ -21,21 +21,21 @@ namespace sdk {
 ///       .build();
 ///   server->start();
 class ServerBuilder {
-public:
-    ServerBuilder& set_endpoint(const std::string& endpoint);
-    ServerBuilder& set_transport(transport::TransportType type);
-    ServerBuilder& add_service(std::shared_ptr<rpc::IService> service);
-    ServerBuilder& set_max_connections(size_t n);
-    ServerBuilder& enable_builtins(bool enabled);
+ public:
+  ServerBuilder& set_endpoint(const std::string& endpoint);
+  ServerBuilder& set_transport(transport::TransportType type);
+  ServerBuilder& add_service(std::shared_ptr<rpc::IService> service);
+  ServerBuilder& set_max_connections(size_t n);
+  ServerBuilder& enable_builtins(bool enabled);
 
-    /// Build and return the configured Server.
-    /// Throws std::invalid_argument if endpoint is empty.
-    std::unique_ptr<rpc::Server> build() const;
+  /// Build and return the configured Server.
+  /// Throws std::invalid_argument if endpoint is empty.
+  std::unique_ptr<rpc::Server> build() const;
 
-private:
-    rpc::ServerConfig config_;
-    std::vector<std::shared_ptr<rpc::IService>> services_;
+ private:
+  rpc::ServerConfig config_;
+  std::vector<std::shared_ptr<rpc::IService>> services_;
 };
 
-} // namespace sdk
-} // namespace ibridger
+}  // namespace sdk
+}  // namespace ibridger
