@@ -6,6 +6,7 @@ import {
   RpcError,
   TimeoutError,
   ProtoType,
+  ReconnectOptions,
 } from '../../src/rpc/client';
 
 // ─── Test helpers ─────────────────────────────────────────────────────────────
@@ -138,6 +139,29 @@ test('call throws when not connected', async () => {
   ).rejects.toThrow('Not connected');
 });
 
+test('isConnected becomes false and call throws after transport disconnects', async () => {
+  const client = new IBridgerClient({ endpoint: '/unused' });
+  const inner = client as unknown as { codec: ICodec | null };
+
+  // Inject a mock codec, then simulate the onDisconnect callback that
+  // IBridgerClient.connect() registers on UnixSocketConnection.
+  inner.codec = mockCodec({ type: ibridger.MessageType.RESPONSE, status: ibridger.StatusCode.OK });
+  expect(client.isConnected).toBe(true);
+
+  // Fire the callback the same way onDisconnect would.
+  inner.codec = null;
+  expect(client.isConnected).toBe(false);
+
+  await expect(
+    client.call(
+      'S', 'M',
+      ibridger.Ping.create({}),
+      ibridger.Ping as unknown as ProtoType<ibridger.Ping>,
+      ibridger.Pong as unknown as ProtoType<ibridger.Pong>,
+    ),
+  ).rejects.toThrow('Not connected');
+});
+
 // ─── ping() convenience ───────────────────────────────────────────────────────
 
 test('ping() sends to ibridger.Ping/Ping and returns Pong', async () => {
@@ -219,4 +243,127 @@ test('request IDs increment with each call', async () => {
   }
 
   expect(sentIds).toEqual([1, 2, 3]);
+});
+
+// ─── Reconnect: call waits while reconnecting ─────────────────────────────────
+
+/** Build a client with reconnectOpts, bypassing real socket connection. */
+function clientWithReconnect(opts: ReconnectOptions): IBridgerClient {
+  const client = new IBridgerClient({ endpoint: '/unused' }, opts);
+  return client;
+}
+
+type ClientInternals = {
+  codec: ICodec | null;
+  reconnecting: boolean;
+  scheduleReconnect(): void;
+};
+
+function internals(client: IBridgerClient): ClientInternals {
+  return client as unknown as ClientInternals;
+}
+
+test('call() blocks until codec is restored when reconnecting', async () => {
+  const pong = ibridger.Pong.create({});
+  const codec = mockCodec({
+    type:    ibridger.MessageType.RESPONSE,
+    status:  ibridger.StatusCode.OK,
+    payload: ibridger.Pong.encode(pong).finish(),
+  });
+
+  const client = clientWithReconnect({});
+  const inn = internals(client);
+
+  // Simulate: codec was lost, reconnect is in progress.
+  inn.codec = null;
+  inn.reconnecting = true;
+
+  // Start the call — it should block waiting for reconnect.
+  const callPromise = client.call(
+    'S', 'M',
+    ibridger.Ping.create({}),
+    ibridger.Ping as unknown as ProtoType<ibridger.Ping>,
+    ibridger.Pong as unknown as ProtoType<ibridger.Pong>,
+  );
+
+  // Simulate reconnect completing after a short delay.
+  await new Promise<void>((r) => setTimeout(r, 60));
+  inn.codec = codec;
+  inn.reconnecting = false;
+
+  await expect(callPromise).resolves.toBeDefined();
+});
+
+test('call() rejects when reconnect attempts are exhausted', async () => {
+  const client = clientWithReconnect({});
+  const inn = internals(client);
+
+  // Simulate: codec lost, reconnect already gave up.
+  inn.codec = null;
+  inn.reconnecting = false;
+
+  await expect(
+    client.call(
+      'S', 'M',
+      ibridger.Ping.create({}),
+      ibridger.Ping as unknown as ProtoType<ibridger.Ping>,
+      ibridger.Pong as unknown as ProtoType<ibridger.Pong>,
+    ),
+  ).rejects.toThrow('exhausted');
+});
+
+test('scheduleReconnect() retries connect() and fires onReconnect', async () => {
+  const onReconnect = jest.fn();
+  const client = clientWithReconnect({ baseDelayMs: 1, onReconnect });
+  const inn = internals(client);
+
+  // Stub connect() so it injects a codec without opening a real socket.
+  const codec = mockCodec({ type: ibridger.MessageType.RESPONSE, status: ibridger.StatusCode.OK });
+  jest.spyOn(client, 'connect').mockImplementation(async () => {
+    inn.codec = codec;
+  });
+
+  inn.codec = null;
+  inn.scheduleReconnect();
+
+  // Wait for the async reconnect loop to complete (baseDelayMs=1 → ~1ms).
+  await new Promise<void>((r) => setTimeout(r, 50));
+
+  expect(client.connect).toHaveBeenCalledTimes(1);
+  expect(onReconnect).toHaveBeenCalledTimes(1);
+  expect(inn.reconnecting).toBe(false);
+  expect(client.isConnected).toBe(true);
+});
+
+test('scheduleReconnect() stops after maxAttempts', async () => {
+  const client = clientWithReconnect({ baseDelayMs: 1, maxAttempts: 3 });
+  const inn = internals(client);
+
+  // connect() always fails.
+  jest.spyOn(client, 'connect').mockRejectedValue(new Error('still down'));
+
+  inn.codec = null;
+  inn.scheduleReconnect();
+
+  // Wait long enough for all 3 attempts: 1 + 2 + 4 = 7ms plus margin.
+  await new Promise<void>((r) => setTimeout(r, 100));
+
+  expect(client.connect).toHaveBeenCalledTimes(3);
+  expect(inn.reconnecting).toBe(false);
+});
+
+test('scheduleReconnect() does not run twice concurrently', async () => {
+  const client = clientWithReconnect({ baseDelayMs: 1 });
+  const inn = internals(client);
+
+  const codec = mockCodec({ type: ibridger.MessageType.RESPONSE, status: ibridger.StatusCode.OK });
+  jest.spyOn(client, 'connect').mockImplementation(async () => { inn.codec = codec; });
+
+  inn.codec = null;
+  inn.scheduleReconnect();
+  inn.scheduleReconnect(); // second call should be ignored
+
+  await new Promise<void>((r) => setTimeout(r, 50));
+
+  expect(client.connect).toHaveBeenCalledTimes(1);
 });

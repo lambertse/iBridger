@@ -1,7 +1,7 @@
 // ibridger JS/TypeScript SDK — public API
 
 export { IBridgerClient, RpcError, TimeoutError } from './rpc/client';
-export type { CallOptions, ICodec, ProtoType } from './rpc/client';
+export type { CallOptions, ICodec, ProtoType, ReconnectOptions } from './rpc/client';
 
 export { IBridgerServer, typedMethod } from './rpc/server';
 export type { MethodHandler, ServiceDefinition, ServerConfig } from './rpc/server';

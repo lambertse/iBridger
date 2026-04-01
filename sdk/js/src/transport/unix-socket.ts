@@ -14,6 +14,9 @@ export class UnixSocketConnection implements IConnection {
   private connected = true;
   private readonly waiters: Array<{ need: number; resolve: (b: Buffer) => void; reject: (e: Error) => void }> = [];
 
+  /** Called once when the underlying socket closes or errors unexpectedly. */
+  onDisconnect?: () => void;
+
   private constructor(private readonly socket: net.Socket) {
     socket.on('data', (chunk: Buffer) => {
       this.buffer = Buffer.concat([this.buffer, chunk]);
@@ -25,6 +28,7 @@ export class UnixSocketConnection implements IConnection {
       const err = new TransportError('Connection closed', 'ECONNRESET');
       for (const w of this.waiters) w.reject(err);
       this.waiters.length = 0;
+      this.onDisconnect?.();
     });
 
     socket.on('error', (err: Error) => {
@@ -32,6 +36,7 @@ export class UnixSocketConnection implements IConnection {
       const te = new TransportError(err.message, (err as NodeJS.ErrnoException).code ?? 'EUNKNOWN');
       for (const w of this.waiters) w.reject(te);
       this.waiters.length = 0;
+      this.onDisconnect?.();
     });
   }
 

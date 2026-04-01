@@ -97,6 +97,35 @@ it('isConnected is true after connect and false after close', async () => {
   }
 });
 
+// ─── onDisconnect fires when server closes ────────────────────────────────────
+
+it('calls onDisconnect when the server closes the connection', async () => {
+  const sockPath = tempSocketPath();
+
+  // Server that tracks its sockets so we can destroy them forcefully.
+  const serverSockets = new Set<net.Socket>();
+  const server = net.createServer((s) => {
+    serverSockets.add(s);
+    s.on('close', () => serverSockets.delete(s));
+    s.pipe(s);
+  });
+  await new Promise<void>((r) => server.listen({ path: sockPath }, () => r()));
+
+  const conn = await UnixSocketConnection.connect(sockPath);
+
+  let fired = false;
+  conn.onDisconnect = () => { fired = true; };
+
+  // Destroy all server-side sockets to force the client to see a close event.
+  for (const s of serverSockets) s.destroy();
+  await new Promise<void>((r) => server.close(() => r()));
+  try { fs.unlinkSync(sockPath); } catch {}
+
+  await new Promise<void>((r) => setTimeout(r, 50));
+  expect(fired).toBe(true);
+  expect(conn.isConnected).toBe(false);
+});
+
 // ─── Connection refused ───────────────────────────────────────────────────────
 
 it('rejects when server is not listening', async () => {

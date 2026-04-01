@@ -10,6 +10,17 @@ export interface CallOptions {
   metadata?: Record<string, string>;
 }
 
+export interface ReconnectOptions {
+  /** Max reconnect attempts before giving up. Default: Infinity */
+  maxAttempts?: number;
+  /** Base delay in ms for exponential backoff. Default: 200 */
+  baseDelayMs?: number;
+  /** Cap on backoff delay in ms. Default: 10_000 */
+  maxDelayMs?: number;
+  /** Called when a reconnection attempt succeeds. */
+  onReconnect?: () => void;
+}
+
 /** Codec interface extracted for testability. */
 export interface ICodec {
   send(envelope: ibridger.Envelope): Promise<void>;
@@ -55,12 +66,24 @@ export class IBridgerClient {
   private codec: ICodec | null = null;
   private nextRequestId = 1;
   private callInFlight = false;
+  private reconnecting = false;
 
-  constructor(private readonly config: { endpoint: string; defaultTimeout?: number }) {}
+  /** Called when the underlying transport closes unexpectedly (server died). */
+  onDisconnect?: () => void;
+
+  constructor(
+    private readonly config: { endpoint: string; defaultTimeout?: number },
+    private readonly reconnectOpts?: ReconnectOptions,
+  ) {}
 
   async connect(): Promise<void> {
     if (this.codec) throw new Error('Already connected');
     const conn = await UnixSocketConnection.connect(this.config.endpoint);
+    conn.onDisconnect = () => {
+      this.codec = null;
+      this.onDisconnect?.();
+      if (this.reconnectOpts) this.scheduleReconnect();
+    };
     this.codec = new EnvelopeCodec(new FramedConnection(conn));
   }
 
@@ -92,6 +115,7 @@ export class IBridgerClient {
     respType: ProtoType<TResp>,
     options?: CallOptions,
   ): Promise<TResp> {
+    if (!this.codec && this.reconnectOpts) await this.waitForReconnect();
     if (!this.codec) throw new Error('Not connected');
     if (this.callInFlight) throw new Error('A call is already in flight');
 
@@ -156,4 +180,51 @@ export class IBridgerClient {
     const c = this.codec as unknown as { close?: () => void };
     return typeof c?.close === 'function' ? (c as { close(): void }) : null;
   }
+
+  private scheduleReconnect(): void {
+    if (this.reconnecting) return;
+    this.reconnecting = true;
+
+    const {
+      maxAttempts = Infinity,
+      baseDelayMs = 200,
+      maxDelayMs  = 10_000,
+      onReconnect,
+    } = this.reconnectOpts!;
+
+    (async () => {
+      for (let attempt = 0; attempt < maxAttempts; attempt++) {
+        const delay = Math.min(baseDelayMs * 2 ** attempt, maxDelayMs);
+        await sleep(delay);
+        try {
+          await this.connect();
+          this.reconnecting = false;
+          onReconnect?.();
+          return;
+        } catch {
+          // server still down, keep trying
+        }
+      }
+      this.reconnecting = false; // attempts exhausted
+    })();
+  }
+
+  private waitForReconnect(): Promise<void> {
+    if (this.codec) return Promise.resolve();
+    return new Promise((resolve, reject) => {
+      const check = setInterval(() => {
+        if (this.codec) {
+          clearInterval(check);
+          resolve();
+        } else if (!this.reconnecting) {
+          clearInterval(check);
+          reject(new Error('Connection lost and reconnect attempts exhausted'));
+        }
+      }, 50);
+    });
+  }
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((r) => setTimeout(r, ms));
 }

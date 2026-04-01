@@ -1,6 +1,8 @@
 #include "ibridger/common/logger.h"
 
 #include <atomic>
+#include <cstdio>
+#include <iostream>
 #include <mutex>
 
 namespace ibridger {
@@ -9,7 +11,9 @@ namespace common {
 namespace {
 
 std::mutex         g_mutex;
-LogCallback        g_callback;
+LogCallback        g_callback = [](LogLevel, const std::string& msg) {
+  std::cout << msg << "\n"; 
+};
 std::atomic<int>   g_min_level{static_cast<int>(LogLevel::DEBUG)};
 
 } // namespace
