@@ -1,4 +1,13 @@
-add_library(ibridger_sdk_cpp STATIC
+option(IBRIDGER_BUILD_SHARED "Build shared library" OFF)
+option(IBRIDGER_BUILD_TESTS "Build unit tests" OFF)
+
+if(IBRIDGER_BUILD_SHARED)
+  set(LIB_TYPE SHARED)
+else()
+  set(LIB_TYPE STATIC)
+endif()
+
+add_library(ibridger_sdk_cpp ${LIB_TYPE} 
   src/ibridger_sdk.cpp
   src/server_builder.cpp
   src/service_base.cpp
