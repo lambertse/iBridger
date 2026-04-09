@@ -40,6 +40,7 @@ jobs:
       - name: Configure
         run: >
           cmake -B build
+          -DCMAKE_BUILD_TYPE=Release
           -DIBRIDGER_BUILD_TESTS=ON
           -DIBRIDGER_BUILD_EXAMPLES=ON
       - name: Build
@@ -83,6 +84,7 @@ jobs:
       - name: Configure and build C++
         run: |
           cmake -B build \
+            -DCMAKE_BUILD_TYPE=Release \
             -DIBRIDGER_BUILD_TESTS=ON \
             -DIBRIDGER_BUILD_EXAMPLES=ON
           cmake --build build --parallel 4

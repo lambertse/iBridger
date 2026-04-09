@@ -10,6 +10,12 @@ option(IBRIDGER_BUILD_TESTS "Build unit tests" OFF)
 option(IBRIDGER_BUILD_EXAMPLES "Build example applications" OFF)
 option(IBRIDGER_BUILD_BENCHMARKS "Build performance benchmarks" OFF)
 
+if(NOT CMAKE_BUILD_TYPE)
+  set(CMAKE_BUILD_TYPE "Release" CACHE STRING "Choose the type of build." FORCE)
+endif()
+
+message(STATUS "Build type: ${CMAKE_BUILD_TYPE}")
+
 if(IBRIDGER_BUILD_TESTS)
   enable_testing()
 endif()

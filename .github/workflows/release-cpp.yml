@@ -60,10 +60,43 @@ jobs:
           name: ${{ steps.archive.outputs.name }}
           path: ${{ steps.archive.outputs.name }}.tar.gz
           retention-days: 1
+  benchmark:
+    name: Benchmark Report
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install protobuf (macOS)
+        run: brew install protobuf
+      - name: Configure
+        run: >
+          cmake -B build
+          -DCMAKE_BUILD_TYPE=Release
+          -DIBRIDGER_BUILD_BENCHMARKS=ON
+      - name: Build benchmarks
+        run: cmake --build build --parallel 4 --config Release --target ibridger_benchmarks
+      - name: Run benchmarks
+        run: |
+          ./build/core/benchmarks/ibridger_benchmarks \
+            --benchmark_format=json \
+            --benchmark_out=benchmark_results.json \
+            --benchmark_min_time=0.5s
+      - name: Generate Markdown report
+        run: |
+          python3 scripts/gen_benchmark_report.py \
+            benchmark_results.json \
+            --output benchmark_report.md \
+            --tag "${{ github.ref_name }}"
+      - name: Upload benchmark artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: benchmark-report
+          path: benchmark_report.md
+          retention-days: 1
+
   release:
     name: Create GitHub Release
     runs-on: macos-latest
-    needs: build
+    needs: [build, benchmark]
     permissions:
       contents: write
     steps:
@@ -78,6 +111,6 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           TAG="${GITHUB_REF_NAME}"
-          gh release create "$TAG" artifacts/*.tar.gz \
+          gh release create "$TAG" artifacts/*.tar.gz artifacts/benchmark_report.md \
             --title "iBridger ${TAG}" \
             --generate-notes
