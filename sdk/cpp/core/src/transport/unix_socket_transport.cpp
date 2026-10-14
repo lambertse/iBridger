@@ -89,7 +89,7 @@ std::error_code UnixSocketTransport::listen(const std::string& endpoint) {
   // Remove a stale socket file from a previous run.
   ::unlink(endpoint.c_str());
 
-  struct sockaddr_un addr{};
+  struct sockaddr_un addr {};
   addr.sun_family = AF_UNIX;
   std::strncpy(addr.sun_path, endpoint.c_str(), sizeof(addr.sun_path) - 1);
 
@@ -140,7 +140,7 @@ UnixSocketTransport::connect(const std::string& endpoint) {
   ::setsockopt(fd, SOL_SOCKET, SO_NOSIGPIPE, &opt, sizeof(opt));
 #endif
 
-  struct sockaddr_un addr{};
+  struct sockaddr_un addr {};
   addr.sun_family = AF_UNIX;
   std::strncpy(addr.sun_path, endpoint.c_str(), sizeof(addr.sun_path) - 1);
 
