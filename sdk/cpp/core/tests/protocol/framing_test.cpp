@@ -46,9 +46,8 @@ TEST(FramedConnection, MultipleSequentialFrames) {
 
   const std::vector<std::string> messages = {
       "frame one",
-      "",  // empty heartbeat
-      "frame three",
-      std::string(1024, 'A'),  // 1 KB
+      "",                                     // empty heartbeat
+      "frame three", std::string(1024, 'A'),  // 1 KB
   };
 
   for (const auto& msg : messages) {
