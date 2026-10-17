@@ -45,7 +45,9 @@ std::shared_ptr<ServiceRegistry> make_registry() {
   std::unordered_map<std::string, MethodHandler> handlers;
 
   handlers["Echo"] = [](const std::string& payload)
-      -> std::pair<std::string, std::error_code> { return {payload, {}}; };
+      -> std::pair<std::string, std::error_code> {
+    return {payload, {}};
+  };
 
   handlers["EchoError"] =
       [](const std::string&) -> std::pair<std::string, std::error_code> {
