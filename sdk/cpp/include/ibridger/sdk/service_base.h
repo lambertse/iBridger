@@ -36,21 +36,21 @@ class ServiceBase : public rpc::IService {
   template <typename TReq, typename TResp>
   void register_method(const std::string& method,
                        std::function<TResp(const TReq&)> handler) {
-    register_method(method,
-                    [handler = std::move(handler)](const std::string& payload)
-                        -> std::pair<std::string, std::error_code> {
-                      TReq req;
-                      if (!req.ParseFromString(payload)) {
-                        return {{},
-                                std::make_error_code(std::errc::bad_message)};
-                      }
-                      TResp resp = handler(req);
-                      std::string out;
-                      if (!resp.SerializeToString(&out)) {
-                        return {{}, std::make_error_code(std::errc::io_error)};
-                      }
-                      return {std::move(out), {}};
-                    });
+    register_method(
+        method,
+        [handler = std::move(handler)](const std::string& payload)
+            -> std::pair<std::string, std::error_code> {
+          TReq req;
+          if (!req.ParseFromString(payload)) {
+            return {{}, std::make_error_code(std::errc::bad_message)};
+          }
+          TResp resp = handler(req);
+          std::string out;
+          if (!resp.SerializeToString(&out)) {
+            return {{}, std::make_error_code(std::errc::io_error)};
+          }
+          return {std::move(out), {}};
+        });
   }
 
  private:
